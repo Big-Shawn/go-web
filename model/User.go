@@ -8,8 +8,12 @@ import (
 	"net/http"
 )
 
-// User 这里创建了一个结构体，需要使用迁移才能自动化生成表
+func init() {
+	// 根据import 的性质，一般会先完成依赖包的init 然后再进行其他包的引入
+	common.AutoMigrateTableWhenBoot(&User{})
+}
 
+// User 这里创建了一个结构体，需要使用迁移才能自动化生成表
 type User struct {
 	gorm.Model
 	Name      string `gorm:"type:varchar(20);not null"`

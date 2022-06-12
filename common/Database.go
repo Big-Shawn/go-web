@@ -5,12 +5,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"io/fs"
-	"path/filepath"
-	"strings"
 )
 
 var DB *gorm.DB
+
+// init Database collection
+func init() {
+	// 必须初始化对全局变量赋值？ 但是不是已经在函数里面赋值过了吗?
+	DB = InitDB()
+
+}
 
 func InitDB() *gorm.DB {
 	//driverName := "mysql"
@@ -65,19 +69,10 @@ func GetDB() *gorm.DB {
 	return InitDB()
 }
 
-func AutoMigrateTableWhenBoot(path string) {
-	//fmt.Println(path)
-	if err := filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
-		if !info.IsDir() {
-			modelFile := info.Name()
-			modelName := strings.SplitN(".", modelFile, 1)
-			// 对文件内容进行正则匹配查看是否存在模型定义
-			// 读取文件内容
-
-			fmt.Println(modelName)
-		}
-		return err
-	}); err != nil {
-		panic(err)
+// 在项目启动时迁移项目中存在的表
+func AutoMigrateTableWhenBoot(model interface{}) {
+	if !DB.Migrator().HasTable(model) {
+		panic(DB.AutoMigrate(model))
 	}
+
 }
