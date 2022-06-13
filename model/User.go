@@ -4,7 +4,6 @@ import (
 	"crypto/md5"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v4"
 	"go-web/common"
 	"go-web/util"
 	"gorm.io/gorm"
@@ -77,7 +76,7 @@ func (user *User) Register(c *gin.Context) {
 	return
 }
 
-func (user User) Enter(ctx gin.Context, telephone, password string) {
+func (user User) Enter(ctx *gin.Context, telephone, password string) {
 	db := common.GetDB()
 
 	db.Where("telephone = ?", telephone).First(&user)
@@ -85,15 +84,15 @@ func (user User) Enter(ctx gin.Context, telephone, password string) {
 	if user.ID != 0 && user.Password == password {
 		// 返回用户信息和token值
 
-		ttl := jwt.NewNumericDate(time.Now().Add(3 * time.Hour * time.Duration(1)))
-		method := "RS256"
+		ttl := time.Hour * 3600
 		playload := user
-		token, err := util.SetToken(ttl, method, playload)
+		token, err := util.SetToken(ttl, playload)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, "服务器错误")
 			return
 		}
 		ctx.JSON(200, token)
+		return
 
 	}
 
