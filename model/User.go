@@ -1,11 +1,15 @@
 package model
 
 import (
+	"crypto/md5"
+	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
 	"go-web/common"
 	"go-web/util"
 	"gorm.io/gorm"
 	"net/http"
+	"time"
 )
 
 func init() {
@@ -43,6 +47,10 @@ func (user *User) Register(c *gin.Context) {
 	if len(user.Password) < 6 {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"code": 422, "msg": "密码不得少于六位"})
 		return
+	} else {
+		// 这里不能直接使用string 进行类型转换，而只能使用这种方式
+		// 将结果转换为16进制
+		user.Password = fmt.Sprintf("%x", md5.Sum([]byte(user.Password)))
 	}
 
 	if len(user.Name) == 0 {
@@ -59,7 +67,6 @@ func (user *User) Register(c *gin.Context) {
 
 	db := common.GetDB()
 
-	db.AutoMigrate(user)
 	db.Create(user)
 
 	c.JSON(200, gin.H{
@@ -68,4 +75,29 @@ func (user *User) Register(c *gin.Context) {
 	})
 
 	return
+}
+
+func (user User) Enter(ctx gin.Context, telephone, password string) {
+	db := common.GetDB()
+
+	db.Where("telephone = ?", telephone).First(&user)
+
+	if user.ID != 0 && user.Password == password {
+		// 返回用户信息和token值
+
+		ttl := jwt.NewNumericDate(time.Now().Add(3 * time.Hour * time.Duration(1)))
+		method := "RS256"
+		playload := user
+		token, err := util.SetToken(ttl, method, playload)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, "服务器错误")
+			return
+		}
+		ctx.JSON(200, token)
+
+	}
+
+	ctx.JSON(http.StatusUnprocessableEntity, "用户名或密码错误")
+	return
+
 }

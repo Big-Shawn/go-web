@@ -72,7 +72,8 @@ func GetDB() *gorm.DB {
 // 在项目启动时迁移项目中存在的表
 func AutoMigrateTableWhenBoot(model interface{}) {
 	if !DB.Migrator().HasTable(model) {
-		panic(DB.AutoMigrate(model))
+		if err := DB.AutoMigrate(model); err != nil {
+			panic(err)
+		}
 	}
-
 }
