@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"crypto/md5"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"go-web/model"
 )
@@ -22,7 +20,11 @@ func Register(ctx *gin.Context) {
 func Enter(ctx *gin.Context) {
 	telephone := ctx.PostForm("telephone")
 	passwd := ctx.PostForm("password")
-	passwd = fmt.Sprintf("%x", md5.Sum([]byte(passwd)))
 
 	model.User{}.Enter(ctx, telephone, passwd)
+}
+
+func Info(ctx *gin.Context) {
+
+	model.User{}.Info(ctx)
 }

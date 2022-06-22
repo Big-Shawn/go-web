@@ -1,11 +1,10 @@
 package model
 
 import (
-	"crypto/md5"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"go-web/common"
 	"go-web/util"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 	"net/http"
 	"time"
@@ -47,9 +46,22 @@ func (user *User) Register(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"code": 422, "msg": "密码不得少于六位"})
 		return
 	} else {
+
+		//这里有两种不同的加密方式
+
 		// 这里不能直接使用string 进行类型转换，而只能使用这种方式
 		// 将结果转换为16进制
-		user.Password = fmt.Sprintf("%x", md5.Sum([]byte(user.Password)))
+		//user.Password = fmt.Sprintf("%x", md5.Sum([]byte(user.Password)))
+
+		// 密码加密
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code": 500,
+				"msg":  "加密错误",
+			})
+		}
+		user.Password = string(hashedPassword)
 	}
 
 	if len(user.Name) == 0 {
@@ -61,6 +73,7 @@ func (user *User) Register(c *gin.Context) {
 			"code": 422,
 			"msg":  "该手机号已注册",
 		})
+
 		return
 	}
 
@@ -69,6 +82,7 @@ func (user *User) Register(c *gin.Context) {
 	db.Create(user)
 
 	c.JSON(200, gin.H{
+		"code": 200,
 		"msg":  "注册成功",
 		"user": user,
 	})
@@ -79,24 +93,59 @@ func (user *User) Register(c *gin.Context) {
 func (user User) Enter(ctx *gin.Context, telephone, password string) {
 	db := common.GetDB()
 
+	// 添加数据验证
+	if len(user.Telephone) != 11 {
+		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"code": 422, "msg": "手机号必须为11位"})
+		return
+	}
+
+	if len(user.Password) < 6 {
+		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"code": 422, "msg": "密码不得少于六位"})
+		return
+	}
+
 	db.Where("telephone = ?", telephone).First(&user)
 
-	if user.ID != 0 && user.Password == password {
+	//注意在密码进行比较时使用的函数
+	if user.ID != 0 && bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)) == nil {
 		// 返回用户信息和token值
 
 		ttl := time.Hour * 3600
 		playload := user
-		token, err := util.SetToken(ttl, playload)
+		token, err := common.ReleaseToken(playload, ttl)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, "服务器错误")
 			return
 		}
-		ctx.JSON(200, token)
-		return
+		//使用 gin.H 来返回自定义的数据结构
+		ctx.JSON(200, gin.H{
+			"code": "200",
+			"msg":  "登录成功",
+			"data": gin.H{
+				"token": token,
+				"user":  user,
+			},
+		})
 
+		return
 	}
 
 	ctx.JSON(http.StatusUnprocessableEntity, "用户名或密码错误")
 	return
 
+}
+
+func (user User) GetInfo(ctx *gin.Context) {
+	userInfo, exists := ctx.Get("user")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"code": 401,
+			"msg":  "用户信息不存在",
+		})
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"code": 200,
+		"msg":  userInfo,
+	})
 }
